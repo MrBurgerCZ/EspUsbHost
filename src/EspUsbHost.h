@@ -770,6 +770,9 @@ public:
   using GamepadCallback = std::function<void(const EspUsbHostGamepadEvent &)>;
   using VendorInputCallback = std::function<void(const EspUsbHostVendorInput &)>;
   using SystemControlCallback = std::function<void(const EspUsbHostSystemControlEvent &)>;
+  using InterfaceFilterCallback = std::function<bool(uint16_t vid, uint16_t pid, uint8_t interfaceNum, uint8_t interfaceClass, uint8_t interfaceProtocol)>;
+
+  void onInterfaceFilter(InterfaceFilterCallback callback);
 
   EspUsbHost();
   ~EspUsbHost();
@@ -1304,6 +1307,8 @@ private:
   GamepadCallback gamepadCallback_;
   VendorInputCallback vendorInputCallback_;
   SystemControlCallback systemControlCallback_;
+
+  InterfaceFilterCallback interfaceFilterCallback_ = nullptr;
 };
 
 class EspUsbHostMscFS : public fs::FS

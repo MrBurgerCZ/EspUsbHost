@@ -1398,6 +1398,10 @@ void EspUsbHost::onHIDInput(HIDInputCallback callback)
 {
   hidInputCallback_ = callback;
 }
+void EspUsbHost::onInterfaceFilter(InterfaceFilterCallback callback)
+{
+  interfaceFilterCallback_ = callback;
+}
 
 void EspUsbHost::onHIDReportDescriptor(HIDReportDescriptorCallback callback)
 {
@@ -2902,7 +2906,6 @@ bool EspUsbHost::mscCommand(DeviceState &device,
   };
 
   const uint8_t commandOpcode = command[0];
-  const bool allowResetRecovery = commandOpcode != SCSI_CMD_SYNCHRONIZE_CACHE_10;
   bool requestSenseAfterCommand = false;
   const uint32_t tag = device.mscTag++;
   EspUsbHostMscCbw cbw = {};
@@ -2946,10 +2949,7 @@ bool EspUsbHost::mscCommand(DeviceState &device,
          csw.tag == tag;
     if (!cswTransferOk)
     {
-      if (allowResetRecovery)
-      {
-        mscResetRecovery(device, timeoutMs);
-      }
+      mscResetRecovery(device, timeoutMs);
     }
     if (cswTransferOk && !ok)
     {
@@ -2959,10 +2959,7 @@ bool EspUsbHost::mscCommand(DeviceState &device,
                static_cast<unsigned long>(csw.tag),
                static_cast<unsigned long>(tag));
       setLastError(ESP_FAIL);
-      if (allowResetRecovery)
-      {
-        mscResetRecovery(device, timeoutMs);
-      }
+      mscResetRecovery(device, timeoutMs);
     }
     if (ok && csw.status != USB_MSC_CSW_STATUS_PASSED)
     {
@@ -2973,13 +2970,9 @@ bool EspUsbHost::mscCommand(DeviceState &device,
       ok = false;
       if (csw.status == USB_MSC_CSW_STATUS_PHASE_ERROR)
       {
-        if (allowResetRecovery)
-        {
-          mscResetRecovery(device, timeoutMs);
-        }
+        mscResetRecovery(device, timeoutMs);
       }
-      else if (commandOpcode != SCSI_CMD_REQUEST_SENSE &&
-               commandOpcode != SCSI_CMD_SYNCHRONIZE_CACHE_10)
+      else if (commandOpcode != SCSI_CMD_REQUEST_SENSE)
       {
         requestSenseAfterCommand = true;
       }
@@ -2987,10 +2980,7 @@ bool EspUsbHost::mscCommand(DeviceState &device,
   }
   else
   {
-    if (allowResetRecovery)
-    {
-      mscResetRecovery(device, timeoutMs);
-    }
+    mscResetRecovery(device, timeoutMs);
   }
 
   vSemaphoreDelete(context.done);
@@ -4787,7 +4777,24 @@ void EspUsbHost::handleDescriptor(uint8_t descriptorType, const uint8_t *data)
         isMscInterface ||
         isVendorSerialInterface)
     {
-      currentClaimResult_ = usb_host_interface_claim(clientHandle_, device->handle, currentInterfaceNumber_, intf->bAlternateSetting);
+          bool shouldClaim = true;
+          if (interfaceFilterCallback_)
+          {
+            shouldClaim = interfaceFilterCallback_(device->info.vid,
+                                                   device->info.pid,
+                                                   currentInterfaceNumber_,
+                                                   currentInterfaceClass_,
+                                                   currentInterfaceProtocol_);
+          }
+
+          if (shouldClaim)
+          {
+            currentClaimResult_ = usb_host_interface_claim(clientHandle_, device->handle, currentInterfaceNumber_, intf->bAlternateSetting);
+          }
+          else
+          {
+            currentClaimResult_ = ESP_ERR_NOT_SUPPORTED;
+          }
       for (uint8_t i = 0; i < device->interfaceInfoCount; i++)
       {
         EspUsbHostInterfaceInfo &info = device->interfaceInfos[i];
