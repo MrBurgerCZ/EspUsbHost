@@ -2,6 +2,13 @@
 
 > 日本語版: [README.ja.md](README.ja.md)
 
+> [!IMPORTANT]
+> This is a modified version of the EspUsbHost library to better fit my needs.
+>
+> It adds a manual filter to blacklist unwanted USB interfaces to be connected.
+>
+> You can find the original on [**tanakamasayuki/EspUsbHost**](https://github.com/tanakamasayuki/EspUsbHost).
+
 Arduino library for using USB Host on ESP32-S3 and ESP32-P4.
 
 USB events are processed in a background FreeRTOS task, so `loop()` does not need to call any USB polling function. Register callbacks in `setup()`, call `begin()`, and the library handles the rest.
